@@ -1,0 +1,158 @@
+package projeto.gestao.security.security.config;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ProviderManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
+
+import lombok.RequiredArgsConstructor;
+
+@Configuration
+@EnableMethodSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+	private final UserDetailsService userDetailsService;
+
+	@Value("${cors.origens-permitidas:http://localhost:4200}")
+	private List<String> origensPermitidas;
+
+	@Bean
+	public SecurityFilterChain securityFilterChain(
+			HttpSecurity http,
+			OriginValidationFilter originValidationFilter) throws Exception {
+
+		http
+				.csrf(csrf -> csrf.disable())
+
+				.cors(cors ->
+						cors.configurationSource(corsConfigurationSource())
+				)
+
+				.sessionManagement(session ->
+						session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+				)
+
+				.authorizeHttpRequests(auth ->
+						auth
+								.requestMatchers("/api/auth/login").permitAll()
+								.anyRequest().authenticated()
+				)
+
+				.oauth2ResourceServer(oauth2 ->
+						oauth2.jwt(jwt ->
+								jwt.jwtAuthenticationConverter(
+										jwtAuthenticationConverter()
+								)
+						)
+				)
+
+				.addFilterAfter(
+						originValidationFilter,
+						CorsFilter.class
+				);
+
+		return http.build();
+	}
+
+	@Bean
+	public CorsConfigurationSource corsConfigurationSource() {
+
+		CorsConfiguration config = new CorsConfiguration();
+
+		config.setAllowedOrigins(origensPermitidas);
+		config.setAllowedMethods(
+				List.of(
+						"GET",
+						"POST",
+						"PUT",
+						"PATCH",
+						"DELETE",
+						"OPTIONS"
+				)
+		);
+
+		config.setAllowedHeaders(
+				List.of(
+						"Authorization",
+						"Content-Type"
+				)
+		);
+
+		config.setExposedHeaders(
+				List.of("Location")
+		);
+
+		config.setMaxAge(3600L);
+
+		UrlBasedCorsConfigurationSource source =
+				new UrlBasedCorsConfigurationSource();
+
+		source.registerCorsConfiguration(
+				"/api/**",
+				config
+		);
+
+		return source;
+	}
+
+	@Bean
+	public JwtAuthenticationConverter jwtAuthenticationConverter() {
+
+		JwtGrantedAuthoritiesConverter authoritiesConverter =
+				new JwtGrantedAuthoritiesConverter();
+
+		authoritiesConverter.setAuthoritiesClaimName("perfis");
+		authoritiesConverter.setAuthorityPrefix("");
+
+		JwtAuthenticationConverter converter =
+				new JwtAuthenticationConverter();
+
+		converter.setJwtGrantedAuthoritiesConverter(
+				authoritiesConverter
+		);
+
+		return converter;
+	}
+
+	@Bean
+	public FilterRegistrationBean<OriginValidationFilter> originFilterRegistration(
+			OriginValidationFilter filter) {
+
+		FilterRegistrationBean<OriginValidationFilter> registration =
+				new FilterRegistrationBean<>(filter);
+
+		registration.setEnabled(false);
+
+		return registration;
+	}
+
+	@Bean
+	public AuthenticationManager authenticationManager(
+			PasswordEncoder passwordEncoder) {
+
+		DaoAuthenticationProvider provider =
+				new DaoAuthenticationProvider(userDetailsService);
+
+		provider.setPasswordEncoder(passwordEncoder);
+
+		return new ProviderManager(provider);
+	}
+}
