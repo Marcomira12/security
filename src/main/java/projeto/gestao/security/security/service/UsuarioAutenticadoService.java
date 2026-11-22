@@ -7,7 +7,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import lombok.RequiredArgsConstructor;
-
+/*
 @Service
 @RequiredArgsConstructor
 public class UsuarioAutenticadoService {
@@ -27,4 +27,4 @@ public class UsuarioAutenticadoService {
 		return usuarioRepository.findByCpfUsuario(auth.getName()).orElseThrow(
 				() -> new AuthenticationCredentialsNotFoundException("Usuário autenticado não encontrado"));
 	}
-}
+}*/
